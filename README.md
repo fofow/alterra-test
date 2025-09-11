@@ -1,24 +1,39 @@
-# alterra-test
-
-# naska_hr_employee_import_async
-
-Odoo 18 module to import HR Employees asynchronously using OCA queue_job.
-- Upload CSV/XLSX (columns: Name, Work Email, Job Title, Work Phone)
-- Jobs are chunked (default 500 rows) and run in parallel on channel `hr_import`
-- Optional email notification when finished
-
-## Install
-1. Ensure `queue_job` and `mail` are installed.
+# Alterra Test Skills
+## Import Asyncronus Employee & Invoice API
+### Install
+1. Ensure `queue_job` and `mail` and `auth_api_key` and `alterra_modules` are installed.
 2. Copy this folder into your addons path.
-3. Update app list and install **Async Employee Import (Queue Job)**.
+3. Update app list and install **Alterra Modules**.
 
-## Config
+### Config
 In `odoo.conf`:
 ```
-server_wide_modules = web,base,queue_job
-; channels are defined in XML, but you can still set baseline concurrency for root:
-; [queue_job]
-; channels = root:2
+; [options]
+; longpolling_port = False
+; web.base.url = [[host]]
+; server_wide_modules = web, base, auth_api_key,queue_job
+; gevent_port = 8072
+; websocket = True
+; proxy_mode = True
+; x_sendfile = False
+; workers = 2
+; max_cron_threads = 1
+
 ```
 
-Monitor jobs in Settings → Technical → Queue Jobs.
+## Usage
+
+### Import Employee
+
+```
+go to Menu → Employee → Asyncronus Import Employee
+fill the form and click import.
+test file is include in repo
+
+Monitor jobs in `Menu → Job Queue → Jobs`.
+
+```
+
+### API Invoice
+
+link of api documentation: https://swagger.bassam-dev.icu/
