@@ -55,7 +55,6 @@ class InvoiceController(http.Controller):
                 'state': m.state,
                 'payments': payments,
             })
-        # return self._json({'invoices': data})
         return Response(
             json.dumps({
                 'count': len(data), 
@@ -66,19 +65,9 @@ class InvoiceController(http.Controller):
         )
 
 
-
-
     """Create a new Invoice"""
     @http.route('/api/invoices', type='http', auth='api_key', methods=['POST'], csrf=False)
     def create_invoices(self, **payload):
-        # user = self._require_api_key()
-        # if not user:
-        #     return self._error('Unauthorized', 401)
-        _logger.info('paaaaaaaaaaaaaaaaayyy: %s', payload)
-
-        # items = payload.get('items') or []
-
-
         try:
             data = json.loads(request.httprequest.data.decode())
         except Exception:
@@ -90,7 +79,6 @@ class InvoiceController(http.Controller):
 
         items = data.get('items') or []
 
-        _logger.info('items: %s', items)
         if not isinstance(items, list) or not items:
             return Response(
                 json.dumps({'error': 'items must be a non-empty list'}),
@@ -121,45 +109,95 @@ class InvoiceController(http.Controller):
         )
 
 
-
-
-# Update Invoices
+    # Update Invoices
     @http.route('/api/invoices/<int:move_id>', type='http', auth='api_key', methods=['PUT'], csrf=False)
     def update_invoice(self, move_id, **payload):
-        user = self._require_api_key()
-        if not user:
-            return self._error('Unauthorized', 401)
-        move = request.env['account.move'].with_user(user).browse(move_id)
+        move = request.env['account.move'].browse(move_id)
         if not move.exists():
-            return self._error('Invoice not found', 404)
+            return Response(
+                json.dumps({'error': 'Invoice not found'}),
+                status=404,
+                content_type='application/json'
+            )
         if move.state == 'posted':
-            return self._error('Cannot update posted invoice', 400)
+            return Response(
+                json.dumps({'error': 'Cannot update posted invoice'}),
+                status=400,
+                content_type='application/json'
+            )
+
         try:
-            vals = payload.get('values') or {}
-            move.write(vals)
+            try:
+                data = json.loads(request.httprequest.data.decode())
+            except Exception:
+                return Response(
+                    json.dumps({'error': 'Invalid JSON'}),
+                    status=400,
+                    content_type='application/json'
+                )
+
+            # Get the first item from the list (assuming only one invoice update per call)
+            update_vals = data.get('items', [{}])[0]
+            _logger.info('Update invoice %s with values %s', move_id, update_vals)
+            
+            # Handle invoice lines if present
+            if 'lines' in update_vals:
+                lines_vals = update_vals.pop('lines')
+                if lines_vals:
+                    # Clear existing lines
+                    move.invoice_line_ids = [(5, 0, 0)]
+                    # Add new lines
+                    for line in lines_vals:
+                        line_vals = {
+                            'product_id': line.get('product_id'),
+                            'quantity': line.get('quantity', 1.0),
+                            'price_unit': line.get('price_unit', 0.0),
+                            'name': line.get('name', '/'),
+                        }
+                        if line.get('tax_ids'):
+                            line_vals['tax_ids'] = [(6, 0, line['tax_ids'])]
+                        move.invoice_line_ids = [(0, 0, line_vals)]
+            
+            # Update other fields
+            if update_vals:
+                move.write(update_vals)
         except Exception as e:
             _logger.exception('Update invoice failed: %s', e)
-            return self._error(str(e))
-        return self._json({'updated_id': move.id})
+            return Response(
+                json.dumps({'error': str(e)}),
+                status=400,
+                content_type='application/json'
+            )
+
+        # return self._json({'updated_id': move.id})
+        return Response(
+            json.dumps({'updated_id': move.id}),
+            status=200,
+            content_type='application/json'
+        )
 
     # Register Payments
     @http.route('/api/invoices/register-payments', type='http', auth='api_key', methods=['POST'], csrf=False)
     def register_payments(self, **payload):
-        user = self._require_api_key()
-        if not user:
-            return self._error('Unauthorized', 401)
-        items = payload.get('items') or []
+        try:
+            data = json.loads(request.httprequest.data.decode())
+        except Exception:
+            return Response(
+                json.dumps({'error': 'Invalid JSON'}),
+                status=400,
+                content_type='application/json'
+            )
+        items = data.get('items') or []
         results = []
         for it in items:
             move_id = it.get('invoice_id')
             amount = it.get('amount')
             journal_id = it.get('journal_id')
-            move = request.env['account.move'].with_user(user).browse(int(move_id))
+            move = request.env['account.move'].browse(int(move_id))
             if not move.exists() or move.state != 'posted':
                 results.append({'invoice_id': move_id, 'status': 'skip', 'reason': 'not found or not posted'})
                 continue
-                # Use the official wizard so reconciliation rules are respected
-            wiz = request.env['account.payment.register'].with_user(user).with_context(
+            wiz = request.env['account.payment.register'].with_context(
                 active_model='account.move', active_ids=[move.id]
             ).create({
                 'amount': amount,
@@ -171,8 +209,12 @@ class InvoiceController(http.Controller):
             except Exception as e:
                 _logger.exception('Register payment failed: %s', e)
                 results.append({'invoice_id': move.id, 'status': 'error', 'reason': str(e)})
-        return self._json({'results': results})
-
+        # return self._json({'results': results})
+        return Response(
+            json.dumps({'results': results}),
+            status=200,
+            content_type='application/json'
+        )
 
 
     def _prepare_move_vals(self, item):
