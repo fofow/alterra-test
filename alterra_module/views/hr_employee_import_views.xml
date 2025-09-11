@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+  <data>
+    <record id="view_hr_employee_import_wizard" model="ir.ui.view">
+      <field name="name">hr.employee.import.wizard.form</field>
+      <field name="model">hr.employee.import.wizard</field>
+      <field name="arch" type="xml">
+        <form string="Import Employees (Async)">
+          <group>
+            <field name="file" filename="file_name"/>
+            <field name="file_name"/>
+            <field name="has_header"/>
+            <field name="chunk_size"/>
+            <field name="notify_done"/>
+          </group>
+          <footer>
+            <button name="action_queue_import" type="object" string="Queue Import" class="btn-primary"/>
+            <button string="Cancel" class="btn-secondary" special="cancel"/>
+          </footer>
+        </form>
+      </field>
+    </record>
+
+    <record id="action_hr_employee_import_wizard" model="ir.actions.act_window">
+      <field name="name">Async Employee Import</field>
+      <field name="res_model">hr.employee.import.wizard</field>
+      <field name="view_mode">form</field>
+      <field name="target">new</field>
+    </record>
+
+    <menuitem id="menu_hr_employee_import_root"
+              name="Async Import"
+              parent="hr.menu_hr_root"/>
+    <menuitem id="menu_hr_employee_import"
+              name="Import Employees (Async)"
+              parent="menu_hr_employee_import_root"
+              action="action_hr_employee_import_wizard"/>
+  </data>
+</odoo>

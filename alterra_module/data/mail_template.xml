@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+  <!-- <record id="mail_tmpl_hr_import_done" model="mail.template">
+    <field name="name">HR Import Done</field>
+    <field name="model_id" ref="base.model_res_users"/>
+    <field name="subject">Employee Import Finished</field>
+    <field name="email_from">${(user.email_formatted or '')}</field>
+    <field name="body_html" type="html">
+      <![CDATA[
+        <p>Hi,</p>
+        <p>Your employee import job has finished. 
+        Please check <em>Settings → Technical → Queue Jobs</em> and HR → Employees.</p>
+      ]]>
+    </field>
+  </record> -->
+
+
+    <record id="mail_tmpl_hr_import_done" model="mail.template">
+        <field name="name">Mail Group: Send Guidelines</field>
+        <field name="model_id" ref="base.model_res_users"/>
+        <field name="subject">Guidelines of group {{ user.email_formatted or '' }}</field>
+        <field name="email_to">{{ user.email or '' }}</field>
+        <field name="description">Sent to people who subscribed to a mailing group with group guidelines</field>
+        <field name="body_html" type="html">
+            <div>
+                <p>Hello <t t-out="user.partner_id.name or ''"></t>,</p>
+                <p>Your employee import job has finished. Please check <em>Settings → Technical → Queue Jobs</em> and HR → Employees.</p>
+            </div>
+        </field>
+        <field name="lang">{{ object.partner_id.lang }}</field>
+        <field name="auto_delete" eval="True"/>
+    </record>
+
+</odoo>
