@@ -133,17 +133,15 @@ class HrEmployeeImportWizard(models.TransientModel):
             job_graph = chain(job_graph, Employee.delayable()._job_notify_import_done())
         job_graph.delay()
 
+        action_queue_jobs = self.env.ref("queue_job.action_queue_job").read()[0]
+
         return {
-            'type': 'ir.actions.act_window',
-            'name': _('Queue Jobs'),
-            'res_model': 'queue.job',
-            'view_mode': 'tree,form',
-            'views': [(False, 'tree'), (False, 'form')],
-            'target': 'current',
-            'domain': [('state', 'in', ['pending', 'enqueued', 'started'])],
-            'context': {
-                'search_default_group_state': 1,
-                'search_default_group_channel': 1,
-                'search_default_group_method': 1,
+            "type": "ir.actions.client",
+            "tag": "display_notification",
+            "params": {
+                "title": _("Employee import queued"),
+                "message": _("Queued %s job(s). Track them in Technical → Queue Jobs.") % len(batches),
+                "sticky": False,
+                "next": action_queue_jobs,
             },
         }
