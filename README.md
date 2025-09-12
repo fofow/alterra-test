@@ -1,9 +1,14 @@
-# Alterra Test Skills
+# Alterra Test
+
 ## Import Asyncronus Employee & Invoice API
+here i use modules from oca <a href='https://github.com/OCA/server-auth/tree/18.0/auth_api_key'>`auth_api_key`</a> and <a href='https://github.com/OCA/queue/tree/18.0/queue_job'>`queue_job`</a>
+to complete the task
+
 ### Install
 1. Ensure `queue_job` and `mail` and `auth_api_key` and `alterra_modules` are installed.
 2. Copy this folder into your addons path.
 3. Update app list and install **Alterra Modules**.
+4. 
 
 ### Config
 In `odoo.conf`:
@@ -36,4 +41,4 @@ Monitor jobs in `Menu → Job Queue → Jobs`.
 
 ### API Invoice
 
-link of api documentation: https://swagger.bassam-dev.icu/
+link of api documentation: <a href='https://swagger.bassam-dev.icu/api-docs'>API DOCS</a>
