@@ -65,48 +65,39 @@ class InvoiceController(http.Controller):
         )
 
 
-    """Create a new Invoice"""
+    # Create a new Invoice
     @http.route('/api/invoices', type='http', auth='api_key', methods=['POST'], csrf=False)
     def create_invoices(self, **payload):
         try:
             data = json.loads(request.httprequest.data.decode())
         except Exception:
-            return Response(
-                json.dumps({'error': 'Invalid JSON'}),
-                status=400,
-                content_type='application/json'
-            )
+            return Response(json.dumps({'error': 'Invalid JSON'}), status=400, content_type='application/json')
 
         items = data.get('items') or []
-
         if not isinstance(items, list) or not items:
-            return Response(
-                json.dumps({'error': 'items must be a non-empty list'}),
-                status=400,
-                content_type='application/json'
-            )
+            return Response(json.dumps({'error': 'items must be a non-empty list'}), status=400,
+                            content_type='application/json')
 
         created_ids = []
+        errors = []
+
         for it in items:
             try:
-                move_vals = self._prepare_move_vals(it)
-                move = request.env['account.move'].create(move_vals)
-                created_ids.append(move.id)
+                with request.env.cr.savepoint():
+                    move_vals = self._prepare_move_vals(it)
+                    move = request.env['account.move'].create(move_vals)
+                    created_ids.append(move.id)
             except Exception as e:
                 _logger.exception('Create invoice failed: %s', e)
-                return Response(
-                    json.dumps({'error': str(e)}),
-                    status=400,
-                    content_type='application/json'
-                )
-        return Response(
-            json.dumps({
-                'count': len(created_ids), 
-                'data': created_ids
-            }),
-            status=201,
-            content_type='application/json'
-        )
+                errors.append({'item': it, 'error': str(e)})
+
+        status_code = 201 if created_ids else 400
+        result = {'count': len(created_ids), 'data': created_ids}
+        if errors:
+            result['errors'] = errors
+
+        return Response(json.dumps(result), status=status_code, content_type='application/json')
+
 
 
     # Update Invoices
@@ -114,39 +105,26 @@ class InvoiceController(http.Controller):
     def update_invoice(self, move_id, **payload):
         move = request.env['account.move'].browse(move_id)
         if not move.exists():
-            return Response(
-                json.dumps({'error': 'Invoice not found'}),
-                status=404,
-                content_type='application/json'
-            )
+            return Response(json.dumps({'error': 'Invoice not found'}), status=404, content_type='application/json')
+
         if move.state == 'posted':
-            return Response(
-                json.dumps({'error': 'Cannot update posted invoice'}),
-                status=400,
-                content_type='application/json'
-            )
+            return Response(json.dumps({'error': 'Cannot update posted invoice'}), status=400,
+                            content_type='application/json')
 
         try:
-            try:
-                data = json.loads(request.httprequest.data.decode())
-            except Exception:
-                return Response(
-                    json.dumps({'error': 'Invalid JSON'}),
-                    status=400,
-                    content_type='application/json'
-                )
+            data = json.loads(request.httprequest.data.decode())
+        except Exception:
+            return Response(json.dumps({'error': 'Invalid JSON'}), status=400, content_type='application/json')
 
-            # Get the first item from the list (assuming only one invoice update per call)
-            update_vals = data.get('items', [{}])[0]
-            _logger.info('Update invoice %s with values %s', move_id, update_vals)
-            
-            # Handle invoice lines if present
-            if 'lines' in update_vals:
-                lines_vals = update_vals.pop('lines')
-                if lines_vals:
+        update_vals = data.get('items', [{}])[0]
+        _logger.info('Update invoice %s with values %s', move_id, update_vals)
+
+        try:
+            with request.env.cr.savepoint():
+                if 'lines' in update_vals:
+                    lines_vals = update_vals.pop('lines') or []
                     # Clear existing lines
                     move.invoice_line_ids = [(5, 0, 0)]
-                    # Add new lines
                     for line in lines_vals:
                         line_vals = {
                             'product_id': line.get('product_id'),
@@ -157,24 +135,14 @@ class InvoiceController(http.Controller):
                         if line.get('tax_ids'):
                             line_vals['tax_ids'] = [(6, 0, line['tax_ids'])]
                         move.invoice_line_ids = [(0, 0, line_vals)]
-            
-            # Update other fields
-            if update_vals:
-                move.write(update_vals)
+                if update_vals:
+                    move.write(update_vals)
         except Exception as e:
             _logger.exception('Update invoice failed: %s', e)
-            return Response(
-                json.dumps({'error': str(e)}),
-                status=400,
-                content_type='application/json'
-            )
+            return Response(json.dumps({'error': str(e)}), status=400, content_type='application/json')
 
-        # return self._json({'updated_id': move.id})
-        return Response(
-            json.dumps({'updated_id': move.id}),
-            status=200,
-            content_type='application/json'
-        )
+        return Response(json.dumps({'updated_id': move.id}), status=200, content_type='application/json')
+
 
     # Register Payments
     @http.route('/api/invoices/register-payments', type='http', auth='api_key', methods=['POST'], csrf=False)
@@ -182,39 +150,36 @@ class InvoiceController(http.Controller):
         try:
             data = json.loads(request.httprequest.data.decode())
         except Exception:
-            return Response(
-                json.dumps({'error': 'Invalid JSON'}),
-                status=400,
-                content_type='application/json'
-            )
+            return Response(json.dumps({'error': 'Invalid JSON'}), status=400, content_type='application/json')
+
         items = data.get('items') or []
         results = []
+
         for it in items:
             move_id = it.get('invoice_id')
             amount = it.get('amount')
             journal_id = it.get('journal_id')
             move = request.env['account.move'].browse(int(move_id))
+
             if not move.exists() or move.state != 'posted':
                 results.append({'invoice_id': move_id, 'status': 'skip', 'reason': 'not found or not posted'})
                 continue
-            wiz = request.env['account.payment.register'].with_context(
-                active_model='account.move', active_ids=[move.id]
-            ).create({
-                'amount': amount,
-                'journal_id': journal_id,
-            })
+
             try:
-                act = wiz.action_create_payments()
+                with request.env.cr.savepoint():
+                    wiz = request.env['account.payment.register'].with_context(
+                        active_model='account.move', active_ids=[move.id]
+                    ).create({
+                        'amount': amount,
+                        'journal_id': journal_id,
+                    })
+                    wiz.action_create_payments()
                 results.append({'invoice_id': move.id, 'status': 'ok'})
             except Exception as e:
                 _logger.exception('Register payment failed: %s', e)
                 results.append({'invoice_id': move.id, 'status': 'error', 'reason': str(e)})
-        # return self._json({'results': results})
-        return Response(
-            json.dumps({'results': results}),
-            status=200,
-            content_type='application/json'
-        )
+
+        return Response(json.dumps({'results': results}), status=200, content_type='application/json')
 
 
     def _prepare_move_vals(self, item):
