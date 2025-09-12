@@ -8,7 +8,7 @@ to complete the task
 1. Ensure `queue_job` and `mail` and `auth_api_key` and `alterra_modules` are installed.
 2. Copy this folder into your addons path.
 3. Update app list and install **Alterra Modules**.
-4. 
+
 
 ### Config
 In `odoo.conf`:
@@ -42,3 +42,20 @@ Monitor jobs in `Menu → Job Queue → Jobs`.
 ### API Invoice
 
 link of api documentation: <a href='https://swagger.bassam-dev.icu/api-docs'>API DOCS</a>
+#### before use
+1. Ensure `auth_api_key` and `alterra_modules` are installed.
+2. Copy this folder into your addons path.
+3. Update app list and install **Alterra Modules**.
+
+#### how to use
+
+```
+first get api key from odoo
+1. go to Menu → Settings → Users → API Keys
+2. click create
+3. fill the form for user and api key then click create
+4. copy api key
+
+then use api key in header: API-KEY: <token>
+
+```
