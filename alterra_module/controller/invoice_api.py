@@ -161,10 +161,18 @@ class InvoiceController(http.Controller):
             journal_id = it.get('journal_id')
             move = request.env['account.move'].browse(int(move_id))
 
-            if not move.exists() or move.state != 'posted':
-                results.append({'invoice_id': move_id, 'status': 'skip', 'reason': 'not found or not posted'})
+            # if not move.exists() or move.state != 'posted':
+            #     results.append({'invoice_id': move_id, 'status': 'skip', 'reason': 'not found or not posted'})
+            #     continue
+            if not move.exists():
+                results.append({'invoice_id': move_id, 'status': 'skip', 'reason': 'not found'})
                 continue
-
+            elif move.state == 'draft':
+                results.append({'invoice_id': move_id, 'status': 'skip', 'reason': 'Invoice State still in draft'})
+                continue
+            elif move.state != 'posted':
+                results.append({'invoice_id': move_id, 'status': 'skip', 'reason': 'Invoice State is already posted'})
+                continue
             try:
                 with request.env.cr.savepoint():
                     wiz = request.env['account.payment.register'].with_context(
