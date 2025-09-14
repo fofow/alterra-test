@@ -59,3 +59,8 @@ first get api key from odoo
 then use api key in header: API-KEY: <token>
 
 ```
+
+
+check on odoo 18 env <a href="https://bassam-dev.icu">Odoo 18</a>
+
+admin/admin
